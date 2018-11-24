@@ -1,8 +1,7 @@
 import sc2
 from sc2 import run_game, maps, Race, Difficulty
 from sc2.player import Bot, Computer
-from sc2.constants import NEXUS, PROBE, PYLON, ASSIMILATOR
-
+from sc2.constants import *
 
 class Robbot(sc2.BotAI):
     async def on_step(self, iteration):
@@ -12,6 +11,8 @@ class Robbot(sc2.BotAI):
         await self.build_pylons()
         await self.expand()
         await self.build_assimilator()
+        await self.build_stalker_tech()
+        await self.build_stalkers()
 
     async def build_workers(self):
         for nexus in self.units(NEXUS).ready.noqueue:
@@ -19,10 +20,10 @@ class Robbot(sc2.BotAI):
                 await self.do(nexus.train(PROBE))
 
     async def build_pylons(self):
-        if self.supply_left < 5 and not self.already_pending(PYLON):
+        if self.supply_left < 5:
             nexuses = self.units(NEXUS).ready
             if nexuses.exists:
-                if self.can_afford(PYLON):
+                if self.can_afford(PYLON) and not self.already_pending(PYLON):
                     await self.build(PYLON, nexuses.first)
 
     async def expand(self):
@@ -39,8 +40,22 @@ class Robbot(sc2.BotAI):
                         if worker is not None:
                             await self.do(worker.build(ASSIMILATOR, vespene))
 
+    async def build_stalker_tech(self):
+        if self.units(PYLON).ready.exists:
+            pylon = self.units(PYLON).ready.random
+            if self.units(GATEWAY).exists and not self.units(CYBERNETICSCORE).exists:
+                if self.can_afford(CYBERNETICSCORE) and not self.already_pending(CYBERNETICSCORE):
+                    await self.build(CYBERNETICSCORE, near=pylon)
+            else:
+                if self.can_afford(GATEWAY) and not self.already_pending(GATEWAY):
+                    await self.build(GATEWAY, near=pylon)
+
+    async def build_stalkers(self):
+        for gateways in self.units(GATEWAY).ready.noqueue:
+            if self.can_afford(STALKER) and self.supply_left > 0:
+                await self.do(gateways.train(STALKER))
 
 run_game(maps.get("(2)16-BitLE"), [
     Bot(Race.Protoss, Robbot()),
     Computer(Race.Terran, Difficulty.Easy)
-], realtime=True)
+], realtime=False)
